@@ -1,0 +1,2 @@
+#!/bin/bash
+aws sqs send-message --queue-url {{ sqs_queue_url }} --message-body {{ ansible_default_ipv4.address }} --region us-east-1

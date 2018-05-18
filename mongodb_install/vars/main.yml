@@ -1,0 +1,10 @@
+---
+# vars file for mongodb_install
+replSetName: "rs0"
+user: "admin"
+password: "password"
+#Additional server id for replica servers
+serverId: ""
+sqs_queue_url: ""
+region: "us-east-1"
+database: "persona"

@@ -1,0 +1,55 @@
+---
+ - hosts: host
+   gather_facts: true
+   tasks:
+   - include_vars: vars/main.yml
+   - name: install dependencies
+     pip:
+       name: pymongo
+     become: yes
+   - name: Add yum configuration
+     template:
+         src: templates/mongo-enterprise.repo.j2
+         dest: /etc/yum.repos.d/mongodb-enterprise.repo
+     become: yes
+   - name: Install Mongo
+     yum:
+        name: mongodb-org
+        state: present
+     become: yes
+  #  - name: Change permissions on certificate file
+  #    file:
+  #        path: /etc/ssl/certs/mongodb_cert.crt
+  #        owner: mongod
+  #        group: mongod
+  #        mode: 0400
+   - name: Copy mongod.conf
+     template:
+         src: templates/mongod.conf.j2
+         dest: /etc/mongod.conf
+     become: yes
+   - name: Restart mongo service
+     service:
+         name: mongod
+         state: restarted
+     become: yes
+   - name: Create the first database
+     raw: mongo {{ database }} --eval 'db.createCollection("test");'
+   - name: Add admin user to the database
+     mongodb_user:
+       user: "{{ user }}"
+       database: "admin"
+       password: "{{ password }}"
+       state: present
+       roles:
+          - { db: "admin", role: "dbAdminAnyDatabase"}
+   - name: Create MongoDB user for application
+     mongodb_user:
+       login_user: "{{ user }}"
+       login_password: "{{ password }}"
+       login_port: "27017"
+       database: "{{ database }}"
+       name: "personauser"
+       password: "peronapwd"
+       roles:
+        - { db: "{{ database }}", role: "readWrite" }

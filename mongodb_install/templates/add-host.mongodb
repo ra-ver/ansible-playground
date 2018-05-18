@@ -1,0 +1,4 @@
+#!/bin/bash
+  mongo --eval '
+    rs.add("$1:27017")
+  '

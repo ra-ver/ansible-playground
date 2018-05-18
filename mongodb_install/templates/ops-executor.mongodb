@@ -1,0 +1,76 @@
+#!/usr/bin/python
+import boto3
+import os
+from pymongo import MongoClient
+import boto3.ec2
+import requests
+
+mongoClient = MongoClient('localhost',27017)
+
+# Create SQS client
+sqs = boto3.client('sqs', region_name='{{ region }}')
+
+queue_url = 'https://sqs.us-east-1.amazonaws.com/538745987955/kf-persona-mongodb-dev-mongodb-lifecycle-sqs'
+isMaster = mongoClient.admin.command('isMaster')['ismaster']
+print("Is this host master: " + str(isMaster))
+# Receive message from SQS queue
+response = sqs.receive_message(
+    QueueUrl=queue_url,
+    AttributeNames=[
+        'SentTimestamp'
+    ],
+    MaxNumberOfMessages=1,
+    MessageAttributeNames=[
+        'All'
+    ],
+    VisibilityTimeout=0,
+    WaitTimeSeconds=0
+)
+
+def removeMessage(receipt_handle):
+    # Delete received message from queue
+    print("Deleting message")
+    sqs.delete_message(
+        QueueUrl=queue_url,
+        ReceiptHandle=receipt_handle
+    )
+
+if isMaster :
+    try:
+        message = response['Messages'][0]
+        receipt_handle = message['ReceiptHandle']
+        output = ""
+        if "backup" in message['Body']:
+            output = os.system("backup.mongodb")
+            print("Output of backup command:" + str(output))
+            print("Backup created")
+            removeMessage(receipt_handle)
+
+        if "10" in message['Body']:
+            print(str(message['Body']) + ":27017")
+            #mongoClient.admin.command('add',str(message['Body']) + ":27017")
+            os.system("add-host.mongodb "+str(message['Body']))
+            print("Adding host")
+            print("Output of backup command:" + str(output))
+            removeMessage(receipt_handle)
+    except:
+        print("Error found")
+    response = requests.get('http://169.254.169.254/latest/meta-data/instance-id')
+    instance_id = response.text
+    lb = boto3.client('elb', region_name="us-east-1")
+    lb.register_instances_with_load_balancer(LoadBalancerName='{{ project_name }}-{{ syslevel }}-elb',
+    Instances=[
+           {
+            'InstanceId': instance_id
+           }
+        ])
+else:
+    response = requests.get('http://169.254.169.254/latest/meta-data/instance-id')
+    instance_id = response.text
+    lb = boto3.client('elb', region_name="us-east-1")
+    lb.deregister_instances_from_load_balancer(LoadBalancerName='{{ project_name }}-{{ syslevel }}-elb',
+    Instances=[
+        {
+            'InstanceId': instance_id
+        }
+    ])
