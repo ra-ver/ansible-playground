@@ -1,0 +1,10 @@
+---
+ - hosts: host
+   gather_facts: true
+   tasks:
+   - name: Install Ansible
+     pip:
+        name: ansible
+        state: present
+     become: yes
+     become_user: root
